@@ -46,8 +46,16 @@
 *.swp
 *.swo
 
+# Code::Blocks project metadata
+*.cbp
+*.depend
+*.layout
+*.workspace
+
 # Local AI agent configuration
 /.agents/
 /.codex/
 
-.
+build/
+autom4te.cache
+.idea/
