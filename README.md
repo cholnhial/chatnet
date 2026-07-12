@@ -92,9 +92,9 @@ After `make install`, start the server first:
 chatnets
 ```
 
-The server forks into the background and listens on port `7999`.
+The server forks into the background and listens on port `7999`. Don't panic if there was no output. It's running! and you can verify with netcat.
 
-Then start one or more clients:
+Then start one or more clients (or start from desktop menu/launcher):
 
 ```sh
 chatnetgui
