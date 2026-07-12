@@ -1,0 +1,13 @@
+-- How to install chatnetgui --
+
+1.change your directory to './src'
+cd ./src
+2. type make to compile
+make
+3. become root and type make install to install
+make install
+or 
+sudo make install
+
+-- DONE --
+

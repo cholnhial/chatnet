@@ -1,0 +1,112 @@
+--- Bounds ---
+
+* We will be working on Linux
+* We will be using gtkmm 
+* Limited knowledge of gtkmm
+
+
+pseudo code:
+AIM: send and receive messages using chatnet server
+
+GUI:
++ Create the class for chatnetgui
+- Create member functions
+- Create child widgets
+- Create signal handlers
+
+the class should set up the gui in one if its
+constructors. chatnetgui()
+                {
+                add(m_VBox);
+                m_VBox.pack_start(m_Menuitem); //Menu items: Quit,Connect,Host 
+                m_VBox.pack_start(m_ScrolledWindow);
+                // Add items to the scrolled window
+                m_ScrolledWindow.pack......
+                add a HButton box with buttons "Quit"
+               // connect buttons to signal handlers
+                m_connect.signal_activate(sigc::mem_fun(*this,chatnetgui::on_connect));
+                m_host.signal_activate(sigc::mem_fun(*this,chatnetgui::on_host));
+                m_button_quit.signal_clicked(sigc::mem_fun(*this,&chatnetgui::on_quit);
+                }
+
+FUNCTIONALITY:
+
+:: Connecting ::
+
+If the user clicks on the menu item "connect" he should
+be prompted with a dialog box for connecting
+the dialog might have it's own class..etc e.g connect_dialog. The dialog
+should ask the user for a name, host, and port the host is listening on.
+After that a connection should be atempted.
+----------------------------------------------------------
+
+:: Hosting ::
+
+If the user clicks on the menu item "host" he should be prompted with a dialog for hosting
+the dialog will have it's own class e.g host_dialog. The dialog should ask for the users name and
+listening port. a message should then be displayed on the TextView widget, example "--- All ready ---"
+
+:: After connecting, or hosting ::
+
+The user is free to run chatnet server commands
+
+:: Client server handler ::
+This thread function will be responsilble for handling messages that arrive
+from the server /msg,/xchat,/list...etc after it receives something like that it will see
+what to do wheather to display the received data on textview...etc
+
+:: synchronize clients ::
+This thread function is responsible for updating the connected clients
+list of chatnetgui and displaying them.
+
+NOTES
+-----------
+It can add or remove a client
+or from the list
+it should do a scan at least every 30 seconds and update 
+* how it may work *
+step 1. scan
+step 2. add connected clients to the people TreeModelColumnRecord
+step 3. if you do a second scan, compare the list with the new if someone is missing remove them from list
+step 4. repeat step 1-4
+
+
+::: WRAP UP ::
+What we will need:
+* networking interface [Creating sockets receiving messages etc..]
+* GUI intersface        [For the user to interact with]
+* Great Error handling
+
+:: Classes ::
+
+class network{}
+
+Responsibilities:
+* connecting to server
+* Handling commands 
+
+/--- New protocols need to be added to chatnet server ---/
+/endchat <name> - ends a chat session
+/ischat <name> - checks if this person is chating
+/xendchat - send to the client which u are chating with
+/xischat <name> - sent to the client <name> is the senders name
+/chating <name> <yes|no> - send to the client that send this <name> is the senders name
+
+/-- Client improve ments --/
+* the protocol needs to be a little more friendly
+* the client needs good error handling
+
+
+//---- How the new protocols work -- //
+/endchat <name> 
+
+This command is sent from the client to the server
+the server then locates the name and sends xendchat to that 
+client which the client than responds to.
+the client can then end the chat
+
+/ischat - This will be a another important protocol it will check if the client is in chating.
+it is sent to the server from the client the server then looks up the name and sends xischat t
+
+
+

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Chatnet
+GenericName=Chat Client
+Comment=Chat with others on the net
+Exec=chatnetgui
+Icon=chatnetgui
+Terminal=false
+Categories=Network;Chat;
+Keywords=chat;messaging;network;
+StartupNotify=true

@@ -1,0 +1,53 @@
+# Autoconf and Automake generated files
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/compile
+/config.guess
+/config.h
+/config.h.in
+/config.log
+/config.status
+/config.sub
+/configure
+/depcomp
+/install-sh
+/missing
+/stamp-h1
+
+# Compiler and Automake dependency output
+**/.deps/
+**/.dirstamp
+*.o
+*.lo
+*.la
+
+# Built executables
+/chatnets
+/chatnetgui
+/server/chatnets
+/client/chatnetgui/src/chatnetgui
+
+# Libtool output, if introduced later
+/.libs/
+**/.libs/
+/libtool
+/ltmain.sh
+
+# Autotools distribution archives
+/chatnet-*.tar.gz
+/chatnet-*.tar.bz2
+/chatnet-*.tar.xz
+/chatnet-*.zip
+
+# Common editor and backup files
+*~
+*.swp
+*.swo
+
+# Local AI agent configuration
+/.agents/
+/.codex/
+
+.
