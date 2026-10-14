@@ -32,7 +32,6 @@ class chatnetgui : public Gtk::Window
     string command;
     bool signals_connected;
     string str_buffer;
-    Glib::Thread* thread_server_handler;
     Gtk::Widget* p_menu_file_connect;
     Gtk::Widget* p_menu_file_disconnect;
     Gtk::Widget* p_toolbar_file_connect;

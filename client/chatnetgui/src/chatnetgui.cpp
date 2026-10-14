@@ -199,12 +199,13 @@ void chatnetgui::on_menu_file_connect()
 // network error
                     if(ret == -1)
                     {
+                        net.close_socket();
                         display_msgbox(m_connect_dialog,"Network error", net.get_buffer(),Gtk::MESSAGE_ERROR);
                     }
                     else
                     {
                         display_msgbox(m_connect_dialog,"Illegal name", net.get_buffer(),Gtk::MESSAGE_INFO);
-                        close(net.get_sockfd()); // close the connected socket
+                        net.close_socket(); // close the connected socket
                     }
                 }
 
@@ -256,8 +257,7 @@ void chatnetgui::on_menu_file_connect()
             m_userlist.on_signal_chat().connect(sigc::mem_fun(*this,&chatnetgui::on_chat));
         }
         m_logview.clear();
-        thread_server_handler->create(sigc::mem_fun(net,&network::mainloop),false);
-//        thread_client_synchronizer->create(sigc::mem_fun(*this,&chatnetgui::client_synchronizer),false);
+        net.mainloop();
         /* Now that we connected some widgets available */
         m_btn_send.set_sensitive(true);
         m_Entry.set_sensitive(true);
@@ -332,6 +332,7 @@ void chatnetgui::on_output()
 network class */
 void chatnetgui::on_network_error()
 {
+    net.close_socket();
     //create a tag
     Glib::RefPtr<Gtk::TextTag> tag;
     tag = Gtk::TextTag::create();
@@ -414,6 +415,7 @@ void chatnetgui::on_menu_file_disconnect()
 {
     str_buffer = "/exit";
     net.input_to_server("/exit");
+    net.close_socket();
 
     Glib::RefPtr<Gtk::TextTag> tag;
     tag = Gtk::TextTag::create();

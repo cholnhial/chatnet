@@ -22,6 +22,7 @@
  */
 int network::start(const char * host, const char * port, const short  type)
 {
+    close_socket();
     int yes = 1;
     int rv;
 
@@ -59,6 +60,7 @@ int network::start(const char * host, const char * port, const short  type)
             {
                 perror("bind");
                 close(sockfd);
+                sockfd = -1;
                 continue;
             }
 
@@ -109,6 +111,7 @@ int network::start(const char * host, const char * port, const short  type)
             {
                 perror("connect");
                 close(sockfd);
+                sockfd = -1;
                 continue;
             }
             break;
@@ -118,6 +121,7 @@ int network::start(const char * host, const char * port, const short  type)
         {
             std::cerr << "Unable to connect.\n";
             output_buffer = "Unable to connect.";
+            freeaddrinfo(servinfo);
             return -1;
         }
     }
@@ -169,174 +173,190 @@ void network::mainloop()
 {
 
 
-    int length = MAX_BUFFER;
-
-// now begin serving the user
-
-    FD_ZERO(&readfds);
-    FD_SET(sockfd, &readfds);
-
+    socket_watch.disconnect();
+    received = 0;
     inchat = false;
     check_ischat = false;
-    int len;
     colour = "darkgreen";
     first_output = 2;
     out("--- Welcome to chatnet. ---\n--- Ready to serve. ---\n");
     first_output = 0;
-    while(true)
+    // GTK widgets and network state are owned by the main-loop thread.
+    socket_watch = Glib::signal_io().connect(
+        sigc::mem_fun(*this, &network::on_socket_ready), sockfd,
+        Glib::IO_IN | Glib::IO_HUP | Glib::IO_ERR | Glib::IO_NVAL);
+}
+
+bool network::on_socket_ready(Glib::IOCondition condition)
+{
+    int length = MAX_BUFFER;
+    const ssize_t len = recv(sockfd, receive_buffer + received,
+                             MAX_BUFFER - received, MSG_DONTWAIT);
+    if(len < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+       && !(condition & (Glib::IO_HUP | Glib::IO_ERR | Glib::IO_NVAL)))
+        return true;
+    if(len <= 0)
     {
-        rv = select(sockfd + 1, &readfds,NULL,NULL,NULL);
-        if(rv == -1)
-        {
-            output_buffer = "A Fatal error ocurred.\n";
-            event_network_error.emit();
-            return;
-        }
+        output_buffer = "Fatal error: Connection closed by host.\n";
+        close_socket();
+        event_network_error.emit();
+        return false;
+    }
+    received += len;
+    // TCP may split a protocol frame across several readiness callbacks.
+    if(received < MAX_BUFFER)
+        return true;
+    memcpy(buffer, receive_buffer, MAX_BUFFER);
+    buffer[MAX_BUFFER] = 0;
+    received = 0;
 
-        if(FD_ISSET(sockfd,&readfds))
-        {
-
-            len = recvall(sockfd,buffer,&length);
-            if(len == -1 || len == 0)
-            {
-                output_buffer = "Fatal error: Connection closed by host.\n";
-                // if is just not the user /exit command emit the signal
-                if(args[0] != "/exit")
-                    event_network_error.emit();
-                return;
-            }
-
-
-            buffer[len] = 0; // terminate the string received
-
-            // no problem check what the received command is
-            parse_argurments(buffer,args,MAX_ARGS);
+    // no problem check what the received command is
+    parse_argurments(buffer,args,MAX_ARGS);
 // This message is sent by chatnet server if a message was
 
-            if(args[0] == "/msg")
+    if(args[0] == "/msg")
+    {
+        // a message
+        // print senders name
+        if(person_inchat == args[1])
+        {
+            const string::size_type colon = args[2].find(':');
+            if(colon != string::npos)
             {
-                // a message
-                // print senders name
-                if(person_inchat == args[1])
-                {
-                    // out("<" + string(field_2) + "> ");
-                    temp_int = 0;
-                    while(args[2][temp_int++] != ':')
-                        {}; // locate the start of the message
-
-                    // print the message
-                    int temp = 0;
-                    temp_int = temp_int - 1;
-                    while(args[2][temp_int++] != '\0')
-                        buffer[temp++] = args[2][temp_int];
-                    colour = "darkgreen";
-                    out("<" + person_inchat + "> " + string(buffer) + "\n");
-
-                }
+                colour = "darkgreen";
+                out("<" + person_inchat + "> " + args[2].substr(colon + 1) + "\n");
             }
 
+        }
+    }
 
-            // not sent to the user
-            else if(args[0]  == "MSGNOTSENT")
-            {
-                colour = "red";
-                out("Your message was not sent to " + person_inchat + ".\n");
-                out("The user you are trying to send the message to might be offline.\n");
-            }
-            // a chat
-            else if(args[0] == "xchat")
-            {
-                if(inchat == false)
-                {
-                    person_inchat = args[1];
-                    colour = "darkgreen";
-                    out("Your are now in a chat session with " + person_inchat + ".\n");
-                    inchat = true;
-                }
 
-            }
-
-            //usually an indication that a name has not been found
-            else if(args[0] == "NOTFOUND")
-            {
-                colour = "red";
-                out("That user has not been found.\n");
-            }
-
-            // an indication the name is illegal
-            else if(args[0] == "ILLEGALNAME")
-            {
-                colour = "red";
-                out("The name might contain illegal characters, or too shot or long.\n");
-            }
-
-            else if(args[0] == "xendchat")
-            {
-                if(inchat == true)
-                {
-                    inchat = false;
-                    //person_inchat = "";
-                    colour = "darkorange";
-                    out("NOTICE: " + person_inchat + " has ended the chat session.\n");
-                    person_inchat = "";
-                }
-            }
-            else if(args[0] == "xischat")
-            {
-                if(inchat == true)
-                {
-                    strcpy(buffer,"chating ");
-                    strcat(buffer, args[1].c_str());
-                    strcat(buffer," yes");
-                }
-                else
-                {
-                    strcpy(buffer,"chating ");
-                    strcat(buffer, args[1].c_str());
-                    strcat(buffer," no");
-                }
-
-                if(sendall(sockfd,buffer,&length) == -1)
-                {
-                    //FIXME:
-                    output_buffer = strerror(errno);
-                    event_network_error.emit();
-                    return;
-                }
-
-            }
-            else if(args[0] == "add")
-            {
-                output_buffer = args[1];
-                event_new_user.emit();
-            }
-            else if(args[0] == "remove")
-            {
-                output_buffer = args[1];
-                event_remove_user.emit();
-                if(inchat == true && person_inchat == args[1])
-                {
-                    inchat = false;
-                    colour = "darkorange";
-                    out("Notice: " + person_inchat + " has left the chat session!\n");
-                }
-
-            }
-            else if(args[0] == "NOSUCHCOMMAND:")
-            {
-                colour = "red";
-                out("The command that you entered was not found. Type help for a list of valid commands.\n");
-            }
-            else
-            {
-// just display what has been received
-                colour = "black";
-                out(buffer);
-            }
+    // not sent to the user
+    else if(args[0]  == "MSGNOTSENT")
+    {
+        colour = "red";
+        out("Your message was not sent to " + person_inchat + ".\n");
+        out("The user you are trying to send the message to might be offline.\n");
+    }
+    // a chat
+    else if(args[0] == "xchat")
+    {
+        if(inchat == false && !check_ischat)
+        {
+            person_inchat = args[1];
+            colour = "darkgreen";
+            out("Your are now in a chat session with " + person_inchat + ".\n");
+            inchat = true;
         }
 
     }
 
+    //usually an indication that a name has not been found
+    else if(args[0] == "NOTFOUND")
+    {
+        check_ischat = false;
+        colour = "red";
+        out("That user has not been found.\n");
+    }
+
+    // an indication the name is illegal
+    else if(args[0] == "ILLEGALNAME")
+    {
+        check_ischat = false;
+        colour = "red";
+        out("The name might contain illegal characters, or too shot or long.\n");
+    }
+
+    else if(args[0] == "xendchat")
+    {
+        if(inchat == true)
+        {
+            inchat = false;
+            //person_inchat = "";
+            colour = "darkorange";
+            out("NOTICE: " + person_inchat + " has ended the chat session.\n");
+            person_inchat = "";
+        }
+    }
+    else if(args[0] == "chating" && check_ischat)
+    {
+        check_ischat = false;
+        if(args[2] == "yes")
+        {
+            colour = "red";
+            out(person_inchat + " Is already in a chat session.\n");
+        }
+        else if(args[2] == "no" && !inchat)
+        {
+            const string request = "/chat " + person_inchat;
+            memset(buffer, 0, sizeof(buffer));
+            request.copy(buffer, MAX_BUFFER - 1);
+            if(sendall(sockfd, buffer, &length) == -1)
+            {
+                output_buffer = strerror(errno);
+                close_socket();
+                event_network_error.emit();
+                return false;
+            }
+            inchat = true;
+            colour = "darkgreen";
+            out("Your are now in a chat session with " + person_inchat + ".\n");
+        }
+    }
+    else if(args[0] == "xischat")
+    {
+        if(inchat == true)
+        {
+            strcpy(buffer,"chating ");
+            strcat(buffer, args[1].c_str());
+            strcat(buffer," yes");
+        }
+        else
+        {
+            strcpy(buffer,"chating ");
+            strcat(buffer, args[1].c_str());
+            strcat(buffer," no");
+        }
+
+        if(sendall(sockfd,buffer,&length) == -1)
+        {
+            //FIXME:
+            output_buffer = strerror(errno);
+            event_network_error.emit();
+            close_socket();
+            return false;
+        }
+
+    }
+    else if(args[0] == "add")
+    {
+        output_buffer = args[1];
+        event_new_user.emit();
+    }
+    else if(args[0] == "remove")
+    {
+        output_buffer = args[1];
+        event_remove_user.emit();
+        if(inchat == true && person_inchat == args[1])
+        {
+            inchat = false;
+            colour = "darkorange";
+            out("Notice: " + person_inchat + " has left the chat session!\n");
+        }
+
+    }
+    else if(args[0] == "NOSUCHCOMMAND:")
+    {
+        colour = "red";
+        out("The command that you entered was not found. Type help for a list of valid commands.\n");
+    }
+    else
+    {
+// just display what has been received
+        colour = "black";
+        out(buffer);
+    }
+    return true;
 }
 
 
@@ -360,7 +380,7 @@ int network::check_name(const string& n)
         return -1;
     }
 
-    buffer[strlen(buffer) + 1] = 0;
+    buffer[recv_bytes] = 0;
     cmp = buffer;
 
     /*-------- If respond from chatnet server is not 'NAMEACCEPTED', then is probably
@@ -412,51 +432,20 @@ int network::input_to_server(const string& str)
             if(args[0] == "/chat" && args[1][0] != '\0')
             {
                 //field_2[strlen(field_2) -1] = '\0';
-                int ret;
                 //------- No problem, not trying to chat with ur self ---------//
-                if(inchat == false)
+                if(inchat == false && !check_ischat)
                 {
                     person_inchat = args[1];
 
                     if(person_inchat != name)
                     {
-                        ret = check_inchat(args[1]);
-                        switch(ret)
-                        {
-                        case 0:
-                        {
-                            inchat = true;
-                            colour = "darkgreen";
-                            out("Your are now in a chat session with " + person_inchat + ".\n");
-                        }
-                        break;
-                        case 1:
-                        {
-                            colour = "red";
-                            out (person_inchat + " Is already in a chat session.\n");
-                            return 0;
-                        }
-                        break;
-                        case 2:
-                        {
-                            colour = "red";
-                            out (person_inchat + " has not been found.\n");
-                            return 0;
-                        }
-                        case 3:
-                        {
-                            colour = "red";
-                            out("The name might contain illegal characters, or too shot or long.\n");
-                            return 0;
-                        }
-                        break;
-                        case -1:
+                        if(check_inchat(person_inchat) == -1)
                         {
                             output_buffer = strerror(errno);
                             event_network_error.emit();
                         }
-                        break;
-                        }
+                        return 0;
+
                     }
                     else
                     {
@@ -547,9 +536,7 @@ bool network::is_chat()
 }
 
 
-/* Checks if a user is in chat on.
-if the user is chating 1 is returned
-else 0. on error -1 is returned */
+/* Request chat status. The reply is handled by on_socket_ready(). */
 
 int network::check_inchat(const string& user)
 {
@@ -560,29 +547,8 @@ int network::check_inchat(const string& user)
     {
         return -1; // error
     }
-    if(recvall(sockfd,buffer,&length) == -1)
-    {
-        return -1;
-    }
-
-    parse_argurments(buffer,args,MAX_ARGS);
-    if(args[0] ==  "NOTFOUND")
-    {
-        return 2;
-    }
-    if(args[0] == "ILLEGALNAME")
-    {
-        return 3;
-    }
-
-    if(args[2] == "yes")
-    {
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
+    check_ischat = true;
+    return 0;
 }
 
 const string& network::get_text_colour()
@@ -592,7 +558,13 @@ const string& network::get_text_colour()
 
 void network::close_socket()
 {
-    close(sockfd);
+    socket_watch.disconnect();
+    if(sockfd >= 0)
+    {
+        close(sockfd);
+        sockfd = -1;
+    }
+    received = 0;
 }
 
 int network::get_sockfd()
@@ -604,11 +576,17 @@ int network::get_sockfd()
 void network::reset()
 {
     inchat = false;
+    check_ischat = false;
     person_inchat = "";
 }
 
-network::network()
+network::network() : sockfd(-1), received(0), inchat(false), check_ischat(false)
 {
     colour = "black";
     first_output = false;
+}
+
+network::~network()
+{
+    close_socket();
 }

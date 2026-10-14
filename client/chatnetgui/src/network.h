@@ -57,7 +57,11 @@ class network
     string args[MAX_ARGS];
     string colour;
     int first_output;
-    char buffer[MAX_BUFFER];
+    char buffer[MAX_BUFFER + 1];
+    char receive_buffer[MAX_BUFFER];
+    size_t received;
+    sigc::connection socket_watch;
+    bool on_socket_ready(Glib::IOCondition condition);
     int output_counter;
     int socket_buffer_counter,terminal_input_counter;
     int temp_int;
@@ -69,6 +73,7 @@ class network
     fd_set readfds;
 public:
     network();
+    ~network();
     int is_first_output()
     {
         return first_output;

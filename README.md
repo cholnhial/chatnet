@@ -23,8 +23,9 @@ loop. The original design notes are preserved in
   thread for each connected client.
 - On connection, the server validates the chosen nickname. Nicknames must be
   unique, 3–16 characters long, and contain only letters and digits.
-- The GTK client receives connection events in a background thread and keeps
-  its visible user list in sync as people join or leave.
+- The GTK client receives connection events through the GTK main loop and keeps
+  its visible user list in sync as people join or leave. Socket reads accumulate
+  partial protocol frames without blocking the interface.
 - Starting a chat checks that the selected user is online and not already in
   another chat. Messages are then relayed privately through the server.
 - The client displays server messages and errors in a scrolling log and
